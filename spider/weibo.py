@@ -7,6 +7,8 @@ import sys
 import json
 import time
 import datetime
+import cStringIO
+import Image
 reload(sys)
 sys.setdefaultencoding('utf-8')
 
@@ -50,6 +52,7 @@ def crawl_profile(profile_url, prod):
             break
     print 'tx_url: ' + prod['user_info_avatar']
     # crawl jianjie
+    prod['user_info_intro'] = ''
     txt_list = hxs.xpath('//div[@class="c"]/text()')
     for txt in txt_list:
         if txt.extract().find('简介') != -1:
@@ -146,6 +149,12 @@ def crawl_weibo(prod, cur_page, max_cmt_page):
             continue  
     print '============END CRAWL WEIBO======================'
 
+def get_img_size(img_url):
+    img_buf = get_html_by_data(img_url.replace('large', 'wap180'), use_cookie=True)
+    c_img_buf = cStringIO.StringIO(img_buf)
+    im = Image.open(c_img_buf)
+    return im.size
+
 def crawl_imgs(wb, wb_dict, a_list):
     wb_dict['image_list'] = []
     zt_url = ''
@@ -160,7 +169,14 @@ def crawl_imgs(wb, wb_dict, a_list):
     if zt_url == '':
         img_url = wb.xpath('./div/a/img[@class="ib"]/@src')
         if len(img_url) > 0:
-            wb_dict['image_list'].append(img_url[0].extract().replace('wap180','large'))
+            try:
+                img_dict = {}
+                img_dict['url'] = img_url[0].extract().replace('wap180', 'large')
+                img_dict['w'], img_dict['h'] = get_img_size(img_dict['url'])
+                wb_dict['image_list'].append(img_dict)
+            except Exception as e:
+                #print e
+                pass
     else:
         zt_hxs = Selector(text=get_html_by_data(zt_url,use_cookie=True))
         a_list = zt_hxs.xpath('//a')
@@ -170,8 +186,12 @@ def crawl_imgs(wb, wb_dict, a_list):
                 if text == '原图':
                     img_url = a.xpath('./@href')[0].extract()
                     img_id = img_url.split('u=')[1].split('&')[0]
-                    wb_dict['image_list'].append('http://ww3.sinaimg.cn/large/' + img_id + '.jpg')
-            except:
+                    img_dict = {}
+                    img_dict['url'] = 'http://ww3.sinaimg.cn/large/' + img_id + '.jpg'
+                    img_dict['w'], img_dict['h'] = get_img_size(img_dict['url'])
+                    wb_dict['image_list'].append(img_dict)
+            except Exception as e:
+                #print e
                 continue
     print 'images: ',
     print wb_dict['image_list']
